@@ -21,11 +21,21 @@ def valid_mode(mode):
         return True
     return False
 
-def local_show_orig_equa_img_and_hist(img, img_name, equa, blocks, equa_blocks):
+def show_orig_equa_img_and_hist(img, equa):
     cv.imshow('original', img)
     cv.imshow('equalized', equa)
     cv.waitKey(0)
     cv.destroyAllWindows()
+
+    fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+    axs[0].hist(img.flatten(), 256, [0, 255], color='blue', edgecolor='black')
+    axs[0].set_title("original")
+    axs[1].hist(equa.flatten(), 256, [0, 256], color='brown', edgecolor='black')
+    axs[1].set_title("equalized")
+    plt.show()
+
+def local_show_orig_equa_img_and_hist(img, img_name, equa, blocks, equa_blocks):
+    show_orig_equa_img_and_hist(img, equa)
 
     print("Saving blocks and equalized blocks histogram figures")
     print("It will generate 8 figures at total, please wait for it...")
@@ -57,17 +67,7 @@ def local_show_orig_equa_img_and_hist(img, img_name, equa, blocks, equa_blocks):
     print("done")
 
 def global_show_orig_equa_img_and_hist(img, equa):
-    cv.imshow('original', img)
-    cv.imshow('equalized', equa)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-
-    fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-    axs[0].hist(img.flatten(), 256, [0, 255], color='blue', edgecolor='black')
-    axs[0].set_title("original")
-    axs[1].hist(equa.flatten(), 256, [0, 256], color='brown', edgecolor='black')
-    axs[1].set_title("equalized")
-    plt.show()
+    show_orig_equa_img_and_hist(img, equa)
 
 def get_cdf(pmf, k_level_max):
     cdf = []
