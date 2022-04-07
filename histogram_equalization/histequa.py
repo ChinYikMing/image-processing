@@ -34,37 +34,27 @@ def show_orig_equa_img_and_hist(img, equa):
     axs[1].set_title("equalized")
     plt.show()
 
-def local_show_orig_equa_img_and_hist(img, img_name, equa, blocks, equa_blocks):
+def local_show_orig_equa_img_and_hist(img, equa, blocks, equa_blocks):
     show_orig_equa_img_and_hist(img, equa)
 
-    print("Saving blocks and equalized blocks histogram figures")
-    print("It will generate 8 figures at total, please wait for it...")
-
-    # show 256 16x16 block histogram and their euqualized block histogram
-    fig, blocks_axs = plt.subplots(8, 8, sharey=True, tight_layout=True)
-    fig2, equa_blocks_axs = plt.subplots(8, 8, sharey=True, tight_layout=True)
+    fig, blocks_axs = plt.subplots(4, 4, sharey=True, tight_layout=True)
+    fig2, equa_blocks_axs = plt.subplots(4, 4, sharey=True, tight_layout=True)
 
     idx = 0
-    # save 4 8x8 blocks figure, so we need to save 4 such figure to get 256 subplot
-    for i in range(0, 4):
-        for row in blocks_axs:
-            for col in row:
-                col.hist(blocks[idx].flatten(), 256, [0, 255], color='blue', edgecolor='black')
-                idx += 1
-        fig.savefig('original block histogram figure(' + img_name + ') ' + str(i))
-        print("saved")
+    for row in blocks_axs:
+        for col in row:
+            col.hist(blocks[idx].flatten(), 256, [0, 255], color='blue', edgecolor='black')
+            idx += 1
+    fig.suptitle('original image blocks histogram', fontsize=16)
 
-    # save 4 8x8 equa_blocks figure, so we need to save 4 such figure to get 256 subplot
     idx = 0
-    for i in range(0, 4):
-        for row in equa_blocks_axs:
-            for col in row:
-                col.hist(equa_blocks[idx].flatten(), 256, [0, 255], color='brown', edgecolor='black')
-                idx += 1
-        fig2.savefig('equalized block histogram figure(' + img_name + ')' + str(i))
-        print("saved")
-
-    print("done")
+    for row in equa_blocks_axs:
+        for col in row:
+            col.hist(equa_blocks[idx].flatten(), 256, [0, 255], color='brown', edgecolor='black')
+            idx += 1
+    fig2.suptitle('equalized image blocks histogram', fontsize=16)
+    
+    plt.show()
 
 def global_show_orig_equa_img_and_hist(img, equa):
     show_orig_equa_img_and_hist(img, equa)
@@ -85,77 +75,63 @@ def get_pmf(hist, img_size):
         pmf.append(x / total_pixel)
     return pmf
 
-def hist_equalize(img, block_row=-1, block_col=-1):
+
+def global_hist_equalize(img):
     img_row = img.shape[0]
     img_col = img.shape[1]
     img_size = img_row * img_col
     gray_level_cnt = 256
 
-    if block_row == -1 and block_col == -1: # global approach
-        img_flat = img.flatten()
-        # calculate # of pixel at gray level k 
-        n = [0] * gray_level_cnt
-        for i in range(0, img_size * 3, 3):  # note: every three element represent a pixel intensity
-            n[img_flat[i]] += 1
+    img_flat = img.flatten()
+    # calculate # of pixel at gray level k 
+    n = [0] * gray_level_cnt
+    for i in range(0, img_size * 3, 3):  # note: every three element represent a pixel intensity
+        n[img_flat[i]] += 1
 
-        # calculate the pmf 
-        pmf = get_pmf(n, img_size)
+    # calculate the pmf 
+    pmf = get_pmf(n, img_size)
 
-        # calculate the s = T(r)
-        s = get_cdf(pmf, k_level_max=255)
-        s = np.array(s, dtype="uint8")
-        equa = s[img]
-        return equa
-    else:                                    # local approach
-        block_size = block_row * block_col
-        blocks = []
-        for i in range(0, img_row, 16):
-            for j in range(0, img_col, 16):
-                blocks.append(np.asarray(img[i:i+16, j:j+16, :]))
-        
-        # calculate # of pixel at gray level k in each block
-        n = [] * img_row # 256x256 / 16x16 = 256(img_row) => we need 256 16x16 blocks
-        for i in range(0, len(blocks)):
-            block_flat = blocks[i].flatten()
-            n_tmp = [0] * gray_level_cnt
-            for j in range(0, block_size * 3, 3):  # note: every three element represent a pixel intensity
-                n_tmp[block_flat[j]] += 1
-            n.append(n_tmp)
+    # calculate the s = T(r)
+    s = get_cdf(pmf, k_level_max=255)
+    s = np.array(s, dtype="uint8")
+    equa = s[img]
+    return equa
 
-        # calculate the pmf 
-        block_pmf = []
-        for i in range(0, len(blocks)):
-            block_pmf.append(get_pmf(n[i], block_size))
-        
-        # calculate the s = T(r)
-        blocks_s = []
-        for i in range(0, len(blocks)):
-            s_tmp = get_cdf(block_pmf[i], k_level_max=255)
-            s_tmp = np.array(s_tmp, dtype="uint8")
-            blocks_s.append(s_tmp)
+def local_hist_equalize(img, block_row, block_col):
+    img_row = img.shape[0]
+    img_col = img.shape[1]
+    img_size = img_row * img_col
 
-        # collect all equa_block for display
-        equa_blocks = []
+    block_size = block_row * block_col
+    blocks = []
 
-        # combine all the histogram equilized block
-        equa = copy.deepcopy(img)
-        for i in range(0, img_row, 16):
-            for j in range(0, img_col, 16):
-                equa[i:i+16, j:j+16, :] = blocks_s[i][img[i:i+16, j:j+16, :]]
-                equa_blocks.append(np.asarray(equa[i:i+16, j:j+16, :]))
+    for i in range(0, img_row, block_row):
+        for j in range(0, img_col, block_col):
+            blocks.append(np.asarray(img[i:i+block_row, j:j+block_col, :]))
+    
+    equa_blocks = []
+    for block in blocks:
+        equa_blocks.append(global_hist_equalize(block))
 
-        return (equa, blocks, equa_blocks)
+    # combine all the histogram equilized block
+    idx = 0
+    equa = copy.deepcopy(img)
+    for i in range(0, img_row, block_row):
+        for j in range(0, img_col, block_col):
+            equa[i:i+block_row, j:j+block_col, :] = equa_blocks[idx]
+            idx += 1
+    
+    return (equa, blocks, equa_blocks)
 
 def global_hist_equa(img_path):
     img = cv.imread(img_path)
-    equa = hist_equalize(img)
+    equa = global_hist_equalize(img)
     global_show_orig_equa_img_and_hist(img, equa)
 
 def local_hist_equa(img_path, block_row=16, block_col=16):
     img = cv.imread(img_path)
-    img_name = os.path.splitext(os.path.basename(img_path))[0]
-    equa, blocks, equa_blocks = hist_equalize(img, block_row, block_col)
-    local_show_orig_equa_img_and_hist(img, img_name, equa, blocks, equa_blocks)
+    equa, blocks, equa_blocks = local_hist_equalize(img, block_row, block_col)
+    local_show_orig_equa_img_and_hist(img, equa, blocks, equa_blocks)
 
 if __name__ == '__main__':
     script_name = sys.argv[0]
@@ -195,6 +171,6 @@ if __name__ == '__main__':
     if mode == 'global':
         global_hist_equa(img_file)
     else:
-        local_hist_equa(img_file, 16, 16)
+        local_hist_equa(img_file, 64, 64)
 
     exit()
