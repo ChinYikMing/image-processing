@@ -91,17 +91,16 @@ def laplacian(img_path, kernel=[0, 1, 0, 1, -4, 1, 0, 1, 0]):
     img_pad_left = ret_tuple[3]
     img_pad_right = ret_tuple[4]
 
-    # blur the padding image to remove noise
-    img_pad_blur = blur(img_pad, (img_pad_top, img_pad_left), [1, 1, 1, 1, 1, 1, 1, 1, 1])
-
     # lapla image result
-    img_lapla = copy.deepcopy(img_pad_blur)
+    lapla_mask = copy.deepcopy(img_pad)
+    # prevent overflow
+    lapla_mask = lapla_mask.astype(np.int16)
 
     # sharp image result
-    img_sharp = copy.deepcopy(img_pad_blur)
-    
-    # convert image data type to 16 bit signed integer to prevent overflow
+    img_sharp = copy.deepcopy(img_pad)
+    # prevent overflow
     img_sharp = img_sharp.astype(np.int16)
+
     img_sharp_row = img_sharp.shape[0]
     img_sharp_col = img_sharp.shape[1]
 
@@ -109,30 +108,29 @@ def laplacian(img_path, kernel=[0, 1, 0, 1, -4, 1, 0, 1, 0]):
         for j in range(0, img_pad_col - 2):
             lapla = 0
             idx = 0
-            subimage = np.asarray(img_pad_blur[i:i+3, j:j+3, :], np.int16)
+            subimage = np.asarray(img_pad[i:i+3, j:j+3, :], np.int16)
 
             for k in range(0, 3):
                 for p in range(0, 3):
                     lapla += subimage[k][p][0] * kernel[idx]
                     idx += 1
 
-            # change the sign depends on the lapla's sign
-            if lapla < 0:
-                img_lapla[i + img_pad_top][j + img_pad_left] = np.asarray([-lapla] * 3)
+            if kernel[4] < 0:
                 img_sharp[i + img_pad_top][j + img_pad_left] -= lapla
             else:
-                img_lapla[i + img_pad_top][j + img_pad_left] = np.asarray([lapla] * 3)
                 img_sharp[i + img_pad_top][j + img_pad_left] += lapla
- 
+
+            lapla_mask[i + img_pad_top][j + img_pad_left] = np.asarray([lapla] * 3)
+
     # remove padding
     img_sharp = np.asarray(img_sharp[img_pad_top:img_sharp_row - img_pad_bottom, \
-                                     img_pad_left:img_sharp_col - img_pad_right, :], np.uint8) 
+                                     img_pad_left:img_sharp_col - img_pad_right, :]) 
 
     # convert image data type back to 8 bit unsigned integer
     img_sharp = cv.convertScaleAbs(img_sharp)
-    img_lapla = cv.convertScaleAbs(img_lapla)
+    lapla_mask = cv.convertScaleAbs(lapla_mask)
 
-    show_imgs([('original', img), ('processed', img_sharp), ('laplacian', img_lapla)])
+    show_imgs([('original', img), ('laplacian mask', lapla_mask), ('processed', img_sharp)])
 
 def highboost(img_path, k):
     img = cv.imread(img_path)
@@ -154,25 +152,13 @@ def highboost(img_path, k):
     # remove padding
     img_blur = np.asarray(img_pad_blur[img_pad_top:img_pad_row  - img_pad_bottom, \
                                      img_pad_left:img_pad_col - img_pad_right, :], np.uint8) 
-    img_blur_row = img_blur.shape[0]
-    img_blur_col = img_blur.shape[1]
 
-    # convert image data type to 16 bit signed integer to prevent overflow
+    mask = cv.subtract(img, img_blur)
+
     img_sharp = copy.deepcopy(img)
-    img_sharp = img_sharp.astype(np.int16)
+    img_sharp = cv.add(img, k * mask)
 
-    for i in range(0, img_row):
-        for j in range(0, img_col):
-            # get the mask by subtract the blurred image from the original image
-            mask = img[i][j] - img_blur[i][j]
-
-            # add the mask with k to the original and produce the sharpend image
-            img_sharp[i][j] = img[i][j] + np.multiply(k, mask)
-
-    # convert image data type back to 8 bit unsigned integer
-    img_sharp = cv.convertScaleAbs(img_sharp)
-
-    show_imgs([('original', img), ('processed', img_sharp)])
+    show_imgs([('original', img), ('mask(k = ' + str(k) + ')', k * mask), ('processed', img_sharp)])
 
 if __name__ == '__main__':
     script_name = sys.argv[0]
